@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>💘 Walentynki</title>
+  <style>
+    :root{
+      --bg1:#ffdde1;
+      --bg2:#ee9ca7;
+      --card: rgba(255,255,255,.75);
+      --shadow: 0 20px 60px rgba(0,0,0,.15);
+      --text:#1f1f1f;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      display:grid;
+      place-items:center;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: radial-gradient(1200px 800px at 20% 10%, var(--bg1), transparent 55%),
+                  radial-gradient(1000px 700px at 80% 90%, var(--bg2), transparent 60%),
+                  linear-gradient(135deg, #fff, #ffd1dc 60%, #fff);
+      color:var(--text);
+      overflow:hidden;
+      padding:24px;
+    }
+
+    .card{
+      width:min(680px, 100%);
+      background: var(--card);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,.6);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      padding: 28px 22px 22px;
+      text-align:center;
+      position:relative;
+    }
+
+    h1{
+      margin:0 0 18px;
+      font-size: clamp(22px, 3.2vw, 34px);
+      line-height:1.15;
+      letter-spacing:-.02em;
+    }
+
+    .photo{
+      width: min(360px, 78vw);
+      aspect-ratio: 1 / 1;
+      border-radius: 24px;
+      overflow:hidden;
+      margin: 0 auto 18px;
+      box-shadow: 0 14px 35px rgba(0,0,0,.18);
+      border: 4px solid rgba(255,255,255,.7);
+      background: rgba(255,255,255,.45);
+    }
+    .photo img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+    }
+
+    .btnRow{
+      margin-top: 10px;
+      display:flex;
+      justify-content:center;
+      gap:14px;
+      position:relative;
+      height: 64px; /* miejsce na "uciekający" przycisk */
+    }
+
+    button{
+      border:0;
+      padding: 14px 18px;
+      border-radius: 16px;
+      font-weight: 700;
+      font-size: 16px;
+      cursor:pointer;
+      transition: transform .08s ease, filter .2s ease;
+      box-shadow: 0 10px 22px rgba(0,0,0,.12);
+      user-select:none;
+    }
+    button:active{ transform: translateY(1px) scale(.99); }
+
+    #yesBtn{
+      background: linear-gradient(135deg, #34d399, #10b981);
+      color:white;
+      min-width: 120px;
+    }
+    #noBtn{
+      background: linear-gradient(135deg, #fb7185, #f43f5e);
+      color:white;
+      position:absolute; /* żeby mógł zmieniać miejsce */
+      left: 50%;
+      transform: translateX(120px);
+      min-width: 120px;
+    }
+
+    .hint{
+      margin: 12px 0 0;
+      opacity:.75;
+      font-size: 13px;
+    }
+
+    /* Widok po kliknięciu TAK */
+    .success{
+      display:none;
+      padding: 24px 6px 10px;
+    }
+    .success h2{
+      margin: 0 0 10px;
+      font-size: clamp(22px, 3vw, 30px);
+    }
+    .success p{
+      margin: 0;
+      font-size: 16px;
+      opacity:.9;
+    }
+
+    /* delikatne serduszka w tle */
+    .float-heart{
+      position:absolute;
+      inset:auto;
+      opacity:.18;
+      filter: blur(.2px);
+      animation: floatUp linear infinite;
+      pointer-events:none;
+      font-size: 22px;
+    }
+    @keyframes floatUp{
+      from { transform: translateY(40px); }
+      to   { transform: translateY(-120vh); }
+    }
+
+    canvas#confetti{
+      position: fixed;
+      inset: 0;
+      pointer-events:none;
+      z-index: 50;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="confetti"></canvas>
+
+  <div class="card" id="card">
+    <div id="mainView">
+      <h1>Czy zostaniesz moją Walentynką? 💖</h1>
+
+      <div class="photo">
+        <img src="zdj.jpg" alt="Zdjeciec">
+      </div>
+
+      <div class="btnRow" id="btnRow">
+        <button id="yesBtn">TAK</button>
+        <button id="noBtn">NIE</button>
+      </div>
+
+      <div class="hint">Podpowiedź: „NIE” ma własne zdanie 😅</div>
+    </div>
+
+    <div class="success" id="successView">
+      <h2>YEEES! 🥰💘</h2>
+      <p>Oficjalnie: najlepsze Walentynki na świecie.</p>
+    </div>
+  </div>
+
+<script>
+  // ====== "Uciekający" przycisk NIE (mobile-friendly) ======
+const noBtn = document.getElementById("noBtn");
+const btnRow = document.getElementById("btnRow");
+
+let last = {x: null, y: null};
+
+function rand(min, max){ return Math.random() * (max - min) + min; }
+
+function moveNoButton() {
+  const rect = btnRow.getBoundingClientRect();
+
+  const maxX = Math.max(0, rect.width  - noBtn.offsetWidth);
+  const maxY = Math.max(0, rect.height - noBtn.offsetHeight);
+
+  // marginesy żeby nie kleiło się do krawędzi
+  const pad = 6;
+
+  // losuj kilka razy, żeby nie wylądował ciągle w tym samym miejscu
+  let x, y;
+  for (let i = 0; i < 8; i++) {
+    x = rand(pad, Math.max(pad, maxX - pad));
+    y = rand(0, Math.max(0, maxY));
+
+    const farEnough =
+      last.x === null ||
+      Math.hypot(x - last.x, y - last.y) > 80; // min dystans
+
+    if (farEnough) break;
+  }
+
+  last = {x, y};
+  noBtn.style.left = x + "px";
+  noBtn.style.top  = y + "px";
+}
+
+noBtn.addEventListener("click", (e) => { e.preventDefault(); moveNoButton(); });
+
+// Na mobile nie ma hover, więc daj "uciekanie" też na dotyk zanim kliknie:
+noBtn.addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  moveNoButton();
+}, {passive:false});
+
+noBtn.addEventListener("mouseenter", moveNoButton);
+window.addEventListener("resize", moveNoButton);
+
+moveNoButton();
+
+
+  // ====== Klik TAK => widok + confetti ======
+  const yesBtn = document.getElementById("yesBtn");
+  const mainView = document.getElementById("mainView");
+  const successView = document.getElementById("successView");
+
+  yesBtn.addEventListener("click", () => {
+    mainView.style.display = "none";
+    successView.style.display = "block";
+    launchConfetti(140);
+    spawnHearts();
+  });
+
+  // ====== Proste confetti (bez bibliotek) ======
+  const canvas = document.getElementById("confetti");
+  const ctx = canvas.getContext("2d");
+
+  function resizeCanvas(){
+    canvas.width = window.innerWidth * devicePixelRatio;
+    canvas.height = window.innerHeight * devicePixelRatio;
+    ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  }
+  window.addEventListener("resize", resizeCanvas);
+  resizeCanvas();
+
+  let pieces = [];
+  let anim = null;
+
+  function launchConfetti(count=120){
+    const w = window.innerWidth, h = window.innerHeight;
+    pieces = [];
+    for(let i=0;i<count;i++){
+      pieces.push({
+        x: Math.random()*w,
+        y: -20 - Math.random()*h*0.2,
+        vx: (Math.random()-0.5)*6,
+        vy:  3 + Math.random()*5,
+        r:  2 + Math.random()*4,
+        a:  Math.random()*Math.PI*2,
+        va: (Math.random()-0.5)*0.2,
+        life:  180 + Math.random()*80
+      });
+    }
+    if(!anim) animate();
+  }
+
+  function animate(){
+    ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
+    pieces.forEach(p=>{
+      p.x += p.vx;
+      p.y += p.vy;
+      p.a += p.va;
+      p.vy += 0.02;
+      p.life -= 1;
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.a);
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life/220));
+      ctx.fillStyle = `hsl(${Math.floor(Math.random()*360)}, 90%, 60%)`;
+      ctx.fillRect(-p.r, -p.r, p.r*2.2, p.r*1.6);
+      ctx.restore();
+    });
+
+    pieces = pieces.filter(p=>p.life>0 && p.y < window.innerHeight+40);
+    if(pieces.length>0){
+      anim = requestAnimationFrame(animate);
+    } else {
+      cancelAnimationFrame(anim);
+      anim = null;
+      ctx.clearRect(0,0,window.innerWidth, window.innerHeight);
+    }
+  }
+
+  // ====== serduszka w tle po "TAK" ======
+  function spawnHearts(){
+    const hearts = ["💗","💖","💘","💞","💕"];
+    for(let i=0;i<18;i++){
+      const el = document.createElement("div");
+      el.className = "float-heart";
+      el.textContent = hearts[Math.floor(Math.random()*hearts.length)];
+      el.style.left = Math.random()*100 + "vw";
+      el.style.bottom = "-40px";
+      el.style.fontSize = (16 + Math.random()*28) + "px";
+      el.style.animationDuration = (6 + Math.random()*6) + "s";
+      el.style.animationDelay = (Math.random()*1.2) + "s";
+      document.body.appendChild(el);
+      setTimeout(()=> el.remove(), 14000);
+    }
+  }
+</script>
+</body>
+</html>
